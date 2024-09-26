@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Matrix Multiplication Game</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+        }
+        .game-container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        .matrices {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .matrix {
+            display: grid;
+            gap: 5px;
+            padding: 10px;
+            background-color: #e0e0ff;
+            border-radius: 5px;
+        }
+        .circle {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-weight: bold;
+            color: white;
+        }
+        .buttons {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #8a2be2;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .drag-circles {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+        }
+        .draggable {
+            cursor: move;
+        }
+        #feedback {
+            text-align: center;
+            font-weight: bold;
+            margin-top: 10px;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.4);
+        }
+        .modal-content {
+            background-color: #fefefe;
+            margin: 15% auto;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 80%;
+            max-width: 600px;
+            border-radius: 10px;
+        }
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .close:hover,
+        .close:focus {
+            color: black;
+            text-decoration: none;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <div class="matrices">
+            <div id="matrix1" class="matrix"></div>
+            <div>×</div>
+            <div id="matrix2" class="matrix"></div>
+            <div>=</div>
+            <div id="resultMatrix" class="matrix"></div>
+        </div>
+        <div class="buttons">
+            <button id="instructionBtn">Instruction</button>
+            <button id="checkAnswerBtn">Check Answer</button>
+            <button id="newGameBtn">New Game</button>
+        </div>
+        <div class="drag-circles" id="dragCircles"></div>
+        <div id="feedback"></div>
+    </div>
+
+    <div id="instructionModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>How to Play the Matrix Multiplication Game</h2>
+            <ol>
+                <li>You will see three matrices: two on the left (2x3 and 3x2) and one on the right (2x2).</li>
+                <li>The game is about multiplying the first two matrices to get the result matrix.</li>
+                <li>Some cells in the result matrix will be yellow with question marks. These are the cells you need to fill.</li>
+                <li>Below the matrices, you'll see three colored circles with numbers. Two of these are correct answers, one is incorrect.</li>
+                <li>Drag and drop the correct numbers onto the yellow circles in the result matrix.</li>
+                <li>Click "Check Answer" to see if you're correct. Green means correct, red means incorrect.</li>
+                <li>Click "New Game" to start a new puzzle.</li>
+            </ol>
+            <h3>How Matrix Multiplication Works:</h3>
+            <p>To multiply a 2x3 matrix by a 3x2 matrix:</p>
+            <ol>
+                <li>The result will be a 2x2 matrix.</li>
+                <li>Each element in the result is the sum of the products of corresponding row elements from the first matrix and column elements from the second matrix.</li>
+                <li>For example, the top-left element of the result is: (a11 * b11) + (a12 * b21) + (a13 * b31), where aij is from the first matrix and bij is from the second matrix.</li>
+            </ol>
+            <p>Practice and have fun improving your matrix multiplication skills!</p>
+        </div>
+    </div>
+
+    <script>
+        let matrix1, matrix2, correctResults;
+
+        function createMatrix(rows, cols, containerId) {
+            const container = document.getElementById(containerId);
+            container.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+            container.innerHTML = ''; // Clear existing content
+            
+            const matrix = [];
+            for (let i = 0; i < rows; i++) {
+                const row = [];
+                for (let j = 0; j < cols; j++) {
+                    const number = Math.floor(Math.random() * 5) + 1; // Random number 1-5
+                    row.push(number);
+                    const circle = document.createElement('div');
+                    circle.className = 'circle';
+                    circle.style.backgroundColor = 'red';
+                    circle.textContent = number;
+                    container.appendChild(circle);
+                }
+                matrix.push(row);
+            }
+            return matrix;
+        }
+
+        function createResultMatrix() {
+            const container = document.getElementById('resultMatrix');
+            container.style.gridTemplateColumns = 'repeat(2, 1fr)';
+            container.innerHTML = ''; // Clear existing content
+            
+            correctResults = multiplyMatrices(matrix1, matrix2);
+            const yellowPositions = getRandomPositions(2, 4);
+            
+            for (let i = 0; i < 4; i++) {
+                const circle = document.createElement('div');
+                circle.className = 'circle';
+                if (yellowPositions.includes(i)) {
+                    circle.style.backgroundColor = 'yellow';
+                    circle.addEventListener('dragover', (e) => e.preventDefault());
+                    circle.addEventListener('drop', handleDrop);
+                    circle.textContent = '?';
+                } else {
+                    circle.style.backgroundColor = 'red';
+                    circle.textContent = correctResults[Math.floor(i / 2)][i % 2];
+                }
+                container.appendChild(circle);
+            }
+        }
+
+        function multiplyMatrices(a, b) {
+            const result = [];
+            for (let i = 0; i < a.length; i++) {
+                result[i] = [];
+                for (let j = 0; j < b[0].length; j++) {
+                    let sum = 0;
+                    for (let k = 0; k < a[0].length; k++) {
+                        sum += a[i][k] * b[k][j];
+                    }
+                    result[i][j] = sum;
+                }
+            }
+            return result;
+        }
+
+        function getRandomPositions(count, max) {
+            const positions = [];
+            while (positions.length < count) {
+                const position = Math.floor(Math.random() * max);
+                if (!positions.includes(position)) {
+                    positions.push(position);
+                }
+            }
+            return positions;
+        }
+
+        function handleDrop(e) {
+            e.preventDefault();
+            const number = e.dataTransfer.getData('text');
+            e.target.textContent = number;
+            e.target.style.backgroundColor = 'green';
+        }
+
+        function createDraggableCircles() {
+            const container = document.getElementById('dragCircles');
+            container.innerHTML = ''; // Clear existing content
+
+            const yellowCircles = document.querySelectorAll('#resultMatrix .circle[style*="yellow"]');
+            const correctNumbers = Array.from(yellowCircles).map(circle => {
+                const index = Array.from(circle.parentNode.children).indexOf(circle);
+                return correctResults[Math.floor(index / 2)][index % 2];
+            });
+
+            const colors = ['green', 'blue', 'purple'];
+            const numbers = [...correctNumbers, Math.floor(Math.random() * 50) + 1]; // Add an incorrect number
+            numbers.sort(() => Math.random() - 0.5); // Shuffle the numbers
+
+            numbers.forEach((number, index) => {
+                const circle = document.createElement('div');
+                circle.className = 'circle draggable';
+                circle.draggable = true;
+                circle.style.backgroundColor = colors[index];
+                circle.textContent = number;
+                circle.addEventListener('dragstart', (e) => {
+                    e.dataTransfer.setData('text', number);
+                });
+                container.appendChild(circle);
+            });
+        }
+
+        function checkAnswer() {
+            const resultCircles = document.querySelectorAll('#resultMatrix .circle');
+            let isCorrect = true;
+            
+            resultCircles.forEach((circle, index) => {
+                const expectedValue = correctResults[Math.floor(index / 2)][index % 2];
+                if (parseInt(circle.textContent) !== expectedValue) {
+                    isCorrect = false;
+                    circle.style.backgroundColor = 'red';
+                } else {
+                    circle.style.backgroundColor = 'green';
+                }
+            });
+
+            const feedback = document.getElementById('feedback');
+            if (isCorrect) {
+                feedback.textContent = 'Correct! Well done!';
+                feedback.style.color = 'green';
+            } else {
+                feedback.textContent = 'Not quite right. Try again!';
+                feedback.style.color = 'red';
+            }
+        }
+
+        function newGame() {
+            matrix1 = createMatrix(2, 3, 'matrix1');
+            matrix2 = createMatrix(3, 2, 'matrix2');
+            createResultMatrix();
+            createDraggableCircles();
+            document.getElementById('feedback').textContent = '';
+        }
+
+        newGame();
+
+        // Get the modal
+        var modal = document.getElementById("instructionModal");
+
+        // Get the button that opens the modal
+        var btn = document.getElementById("instructionBtn");
+
+        // Get the <span> element that closes the modal
+        var span = document.getElementsByClassName("close")[0];
+
+        // When the user clicks on the button, open the modal
+        btn.onclick = function() {
+            modal.style.display = "block";
+        }
+
+        // When the user clicks on <span> (x), close the modal
+        span.onclick = function() {
+            modal.style.display = "none";
+        }
+
+        // When the user clicks anywhere outside of the modal, close it
+        window.onclick = function(event) {
+            if (event.target == modal) {
+                modal.style.display = "none";
+            }
+        }
+
+        document.getElementById('checkAnswerBtn').addEventListener('click', checkAnswer);
+
+        document.getElementById('newGameBtn').addEventListener('click', newGame);
+    </script>
+</body>
+</html>
